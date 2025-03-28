@@ -14,34 +14,51 @@ datasource db {
 }
 
 model Item {
-  id          Int       @id @default(autoincrement())
-  name        String
-  quantity    Float
-  unit        String    // e.g., "pieces", "grams", "ml"
-  category    String    // e.g., "dairy", "meat", "vegetables"
-  expiryDate  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  ingredients Ingredient[]
+  id            Int       @id @default(autoincrement())
+  name          String
+  quantity      Float
+  unit          String    // e.g., "pieces", "grams", "ml"
+  category      String?   // e.g., "dairy", "meat", "vegetables"
+  notes         String?
+  expiryDate    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  ingredients   RecipeIngredient[]
+  equipment     RecipeEquipment[]
 }
 
 model Recipe {
-  id          Int       @id @default(autoincrement())
-  name        String
-  description String
+  id           Int        @id @default(autoincrement())
+  name         String
+  description  String
   instructions String
-  cookingTime Int      // in minutes
-  servings    Int
-  createdAt   DateTime @default(now())
-  ingredients Ingredient[]
+  cookingTime  Int
+  servings     Int
+  createdAt    DateTime   @default(now())
+  ingredients  RecipeIngredient[]
+  equipment    RecipeEquipment[]
 }
 
-model Ingredient {
-  id       Int    @id @default(autoincrement())
-  quantity Float
-  unit     String
-  recipe   Recipe @relation(fields: [recipeId], references: [id])
-  recipeId Int
-  item     Item   @relation(fields: [itemId], references: [id])
-  itemId   Int
+model RecipeIngredient {
+  id        Int      @id @default(autoincrement())
+  recipe    Recipe   @relation(fields: [recipeId], references: [id])
+  recipeId  Int
+  item      Item     @relation(fields: [itemId], references: [id])
+  itemId    Int
+  quantity  Float
+  unit      String
+
+  @@index([recipeId])
+  @@index([itemId])
+}
+
+model RecipeEquipment {
+  id        Int      @id @default(autoincrement())
+  recipe    Recipe   @relation(fields: [recipeId], references: [id])
+  recipeId  Int
+  item      Item     @relation(fields: [itemId], references: [id])
+  itemId    Int
+
+  @@index([recipeId])
+  @@index([itemId])
 }
