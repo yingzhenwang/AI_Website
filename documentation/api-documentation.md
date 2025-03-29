@@ -245,6 +245,7 @@ Generates a recipe based on available ingredients and user preferences.
   "instructions": "1. Season chicken with salt and pepper...",
   "cookingTime": 30,
   "servings": 2,
+  "saved": false,
   "createdAt": "2023-06-15T16:00:00.000Z",
   "ingredients": [
     {
@@ -286,6 +287,174 @@ Generates a recipe based on available ingredients and user preferences.
     },
     ...
   ]
+}
+```
+
+### Generate Multiple Recipes API
+
+```
+POST /generate-recipes
+```
+
+Generates multiple recipes at once based on available ingredients and user preferences.
+
+**Request Body:**
+```json
+{
+  "servings": 2,
+  "preferredItems": [
+    {
+      "id": 1,
+      "name": "Chicken Breast",
+      "quantity": 0.5,
+      "unit": "kg",
+      "category": "Meat & Seafood"
+    },
+    ...
+  ],
+  "specialRequests": "Italian cuisine, quick to prepare",
+  "includeEquipment": true,
+  "equipment": [
+    {
+      "id": 10,
+      "name": "Frying Pan"
+    },
+    ...
+  ],
+  "numberOfRecipes": 3
+}
+```
+
+**Response:**
+```json
+[
+  {
+    "id": 5,
+    "name": "Quick Italian Chicken Pasta",
+    "description": "A delicious and quick Italian-inspired chicken pasta dish.",
+    "instructions": "1. Season chicken with salt and pepper...",
+    "cookingTime": 30,
+    "servings": 2,
+    "saved": false,
+    "createdAt": "2023-06-15T16:00:00.000Z",
+    "ingredients": [...],
+    "equipment": [...]
+  },
+  {
+    "id": 6,
+    "name": "Mediterranean Chicken Salad",
+    "description": "A light and refreshing Mediterranean-style chicken salad.",
+    "instructions": "1. Cook chicken in olive oil...",
+    "cookingTime": 20,
+    "servings": 2,
+    "saved": false,
+    "createdAt": "2023-06-15T16:00:00.000Z",
+    "ingredients": [...],
+    "equipment": [...]
+  },
+  ...
+]
+```
+
+### Get Recipes API
+
+```
+GET /recipes
+```
+
+Retrieves recipes from the database.
+
+**Query Parameters:**
+- `saved` (optional): When set to "true", returns only saved recipes
+
+**Response:**
+```json
+[
+  {
+    "id": 5,
+    "name": "Quick Italian Chicken Pasta",
+    "description": "A delicious and quick Italian-inspired chicken pasta dish.",
+    "instructions": "1. Season chicken with salt and pepper...",
+    "cookingTime": 30,
+    "servings": 2,
+    "saved": true,
+    "createdAt": "2023-06-15T16:00:00.000Z",
+    "ingredients": [...],
+    "equipment": [...]
+  },
+  ...
+]
+```
+
+### Save Recipe API
+
+```
+PUT /recipes/{id}/save
+```
+
+Marks a recipe as saved.
+
+**Parameters:**
+- `id`: The ID of the recipe to save
+
+**Response:**
+```json
+{
+  "id": 5,
+  "name": "Quick Italian Chicken Pasta",
+  "description": "A delicious and quick Italian-inspired chicken pasta dish.",
+  "instructions": "1. Season chicken with salt and pepper...",
+  "cookingTime": 30,
+  "servings": 2,
+  "saved": true,
+  "createdAt": "2023-06-15T16:00:00.000Z",
+  "ingredients": [...],
+  "equipment": [...]
+}
+```
+
+### Available Recipes API
+
+```
+GET /recipes/available
+```
+
+Retrieves saved recipes that can be made with the current ingredients in inventory.
+
+**Response:**
+```json
+[
+  {
+    "id": 5,
+    "name": "Quick Italian Chicken Pasta",
+    "servings": 2,
+    "cookingTime": 30
+  },
+  {
+    "id": 8,
+    "name": "Simple Vegetable Stir Fry",
+    "servings": 2,
+    "cookingTime": 15
+  },
+  ...
+]
+```
+
+### Delete Recipe API
+
+```
+DELETE /recipes/{id}
+```
+
+Deletes a recipe from the database.
+
+**Parameters:**
+- `id`: The ID of the recipe to delete
+
+**Response:**
+```json
+{
+  "success": true
 }
 ```
 

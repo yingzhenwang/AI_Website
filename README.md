@@ -9,6 +9,8 @@ An AI-powered kitchen inventory management and recipe generation application bui
 - **Recipe Generation**: Create recipes based on available ingredients using AI
 - **Image Recognition**: Add items to inventory by uploading images
 - **AI-Powered Categorization**: Automatically categorize items and recommend equipment
+- **Ready to Cook**: Instantly see which saved recipes you can make with your current ingredients
+- **Multiple Recipe Generation**: Generate up to 5 distinct recipes at once to get variety
 
 ## Screenshots
 

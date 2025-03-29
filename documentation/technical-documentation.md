@@ -49,6 +49,7 @@ src/
 - `instructions`: String
 - `cookingTime`: Integer (minutes)
 - `servings`: Integer
+- `saved`: Boolean (default: false)
 - `createdAt`: DateTime
 - Relations: `ingredients`, `equipment`
 
@@ -84,6 +85,7 @@ Handles recipe generation, viewing, saving, and cooking. Includes functionality 
 - Include equipment instructions
 - Save recipes for later use
 - "Cook" recipes (deduct ingredients from inventory)
+- Display "Ready to Cook" recipes that can be made with current inventory
 
 ## API Endpoints
 
@@ -109,6 +111,21 @@ Handles recipe generation, viewing, saving, and cooking. Includes functionality 
 
 ### `/api/uploadthing`
 - Handles image upload functionality
+
+### `/api/generate-recipes`
+- `POST`: Generates multiple recipes at once based on available ingredients and preferences
+
+### `/api/recipes`
+- `GET`: Fetches all recipes, optionally filtered by saved status
+
+### `/api/recipes/:id`
+- `DELETE`: Deletes a recipe by ID
+
+### `/api/recipes/:id/save`
+- `PUT`: Marks a recipe as saved
+
+### `/api/recipes/available`
+- `GET`: Fetches saved recipes that can be made with current inventory
 
 ## AI Integration
 
@@ -141,6 +158,15 @@ The system leverages OpenAI's GPT-4 for several key features:
 4. Include or exclude equipment instructions
 5. View, save, or cook recipes
 
+### Recipe Management
+1. Generate single or multiple recipes based on available ingredients
+2. Specify servings and preferred ingredients
+3. Add special requests (dietary restrictions, cuisine preferences)
+4. Include or exclude equipment instructions
+5. View, save, or cook recipes
+6. See "Ready to Cook" recipe tags for recipes that can be made with current inventory
+7. Quickly access and cook recipes that match current inventory
+
 ## Deployment
 
 The application uses SQLite for development, which stores data in a local file. For production deployment, consider:
@@ -159,4 +185,6 @@ The application uses SQLite for development, which stores data in a local file. 
 5. Advanced filtering and search for recipes and ingredients
 6. Nutrition tracking
 7. Integration with smart kitchen devices
-8. Mobile application 
+8. Mobile application
+9. Recipe recommendations based on user preferences and cooking history
+10. Expiry date tracking and alerts for ingredients 

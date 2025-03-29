@@ -129,6 +129,16 @@ The Recipes tab helps you create recipes based on what you have in your inventor
 - View all your saved recipes
 - See newly generated recipes before deciding to save them
 
+### Ready to Cook Recipes
+
+At the top of the Recipes tab, you'll see a "Ready to Cook" section showing recipe tags for saved recipes that can be made with your current inventory:
+
+- Each tag shows the recipe name and cooking time
+- Click on a tag to see the full recipe details
+- The system automatically checks which saved recipes can be made with your current ingredients
+- You can refresh the list by clicking the refresh icon
+- If no recipes can be made with current ingredients, a helpful message will suggest what to do next
+
 ### Generating a New Recipe
 
 1. Click "Generate Recipe"
@@ -137,7 +147,8 @@ The Recipes tab helps you create recipes based on what you have in your inventor
 4. Choose whether to include cooking equipment instructions
    - If enabled, you can click "Customize equipment" to select specific equipment
 5. Add any special requests (e.g., "vegetarian", "quick meal", "Italian cuisine")
-6. Click "Generate Recipe"
+6. Select the number of recipes to generate (1-5)
+7. Click "Generate Recipes"
 
 ### Working with Recipes
 
@@ -148,13 +159,16 @@ For each generated recipe, you can:
 - **Save**: Keep the recipe for future use
 - **Discard**: Remove the recipe if you're not interested
 - **Cook**: Mark the recipe as cooked, which will automatically:
+  - Save the recipe first (if not already saved)
   - Deduct used ingredients from your inventory
   - Remove the recipe from your list
+  - Update the "Ready to Cook" section based on your new inventory
 
 ### Saved Recipes
 
 - Saved recipes remain available until cooked or deleted
 - You can delete saved recipes by clicking the trash icon
+- Saved recipes that can be made with current ingredients will appear in the "Ready to Cook" section
 
 ## Troubleshooting
 

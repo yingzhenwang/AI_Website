@@ -16,9 +16,16 @@ type RecipeWithIngredients = Prisma.RecipeGetPayload<{
 export async function GET() {
   try {
     // Get all saved recipes where saved is true
-    const savedRecipes = await prisma.recipe.findMany({
+    const savedRecipes = await prisma.$queryRaw`
+      SELECT * FROM Recipe WHERE saved = 1
+    `;
+
+    // Then fetch the full recipe data with ingredients for those recipes
+    const savedRecipesWithIngredients = await prisma.recipe.findMany({
       where: {
-        saved: true
+        id: {
+          in: (savedRecipes as { id: number }[]).map(r => r.id)
+        }
       },
       include: {
         ingredients: {
@@ -27,7 +34,7 @@ export async function GET() {
           }
         }
       }
-    }) as unknown as RecipeWithIngredients[];
+    }) as RecipeWithIngredients[];
 
     // Get current inventory
     const inventory = await prisma.item.findMany({
@@ -40,7 +47,7 @@ export async function GET() {
     });
 
     // Check which recipes can be made with current inventory
-    const availableRecipes = savedRecipes.filter(recipe => {
+    const availableRecipes = savedRecipesWithIngredients.filter(recipe => {
       // Check if all ingredients in the recipe are available in sufficient quantity
       return recipe.ingredients.every(ingredient => {
         const inventoryItem = inventory.find(item => item.id === ingredient.itemId);
