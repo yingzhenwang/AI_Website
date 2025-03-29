@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Recipe, Item } from '@prisma/client';
-import { ChevronUpIcon, ChevronDownIcon, XMarkIcon, BookmarkIcon } from '@heroicons/react/24/outline';
+import { ChevronUpIcon, ChevronDownIcon, XMarkIcon, BookmarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface RecipeGenerationForm {
   servings: number;
@@ -11,6 +11,7 @@ interface RecipeGenerationForm {
   includeEquipment: boolean;
   selectedEquipment: number[];
   showEquipmentSelection: boolean;
+  numberOfRecipes: number;
 }
 
 interface RecipeEquipment {
@@ -27,14 +28,18 @@ interface RecipeWithIngredients extends Recipe {
     item: Item;
   }[];
   equipment?: RecipeEquipment[];
+  saved?: boolean;
 }
 
 export default function Recipes() {
   const [recipes, setRecipes] = useState<RecipeWithIngredients[]>([]);
   const [savedRecipes, setSavedRecipes] = useState<RecipeWithIngredients[]>([]);
+  const [availableRecipes, setAvailableRecipes] = useState<{ id: number; name: string; servings: number; cookingTime: number }[]>([]);
+  const [selectedAvailableRecipe, setSelectedAvailableRecipe] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [cookingId, setCookingId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'new' | 'saved'>('new');
   const [availableItems, setAvailableItems] = useState<Item[]>([]);
   const [form, setForm] = useState<RecipeGenerationForm>({
     servings: 2,
@@ -42,10 +47,14 @@ export default function Recipes() {
     specialRequests: '',
     includeEquipment: false,
     selectedEquipment: [],
-    showEquipmentSelection: false
+    showEquipmentSelection: false,
+    numberOfRecipes: 2  // Default to 2 recipes
   });
   const [inventory, setInventory] = useState<Item[]>([]);
   const [equipment, setEquipment] = useState<Item[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [showIngredientSelection, setShowIngredientSelection] = useState(false);
 
   useEffect(() => {
     // Fetch available items when component mounts
@@ -60,6 +69,24 @@ export default function Recipes() {
     };
     fetchItems();
   }, []);
+
+  // Function to refresh available recipes
+  const refreshAvailableRecipes = async () => {
+    try {
+      const response = await fetch('/api/recipes/available');
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableRecipes(data);
+        
+        // If the currently selected recipe is no longer available, deselect it
+        if (selectedAvailableRecipe !== null && !data.some((r: { id: number }) => r.id === selectedAvailableRecipe)) {
+          setSelectedAvailableRecipe(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing available recipes:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -76,6 +103,16 @@ export default function Recipes() {
         const equipData = await equipResponse.json();
         setEquipment(equipData);
         
+        // Fetch saved recipes
+        const savedRecipesResponse = await fetch('/api/recipes?saved=true');
+        if (savedRecipesResponse.ok) {
+          const savedRecipesData = await savedRecipesResponse.json();
+          setSavedRecipes(savedRecipesData);
+        }
+        
+        // Fetch available recipes (saved recipes that can be cooked with current ingredients)
+        refreshAvailableRecipes();
+        
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -85,6 +122,26 @@ export default function Recipes() {
 
     fetchData();
   }, []);
+
+  const toggleIngredientSelection = () => {
+    setShowIngredientSelection(!showIngredientSelection);
+  };
+
+  const toggleIngredient = (itemId: number) => {
+    setForm(prev => {
+      if (prev.selectedItems.includes(itemId)) {
+        return {
+          ...prev,
+          selectedItems: prev.selectedItems.filter(id => id !== itemId)
+        };
+      } else {
+        return {
+          ...prev,
+          selectedItems: [...prev.selectedItems, itemId]
+        };
+      }
+    });
+  };
 
   const toggleEquipmentSelection = () => {
     if (form.includeEquipment) {
@@ -114,14 +171,20 @@ export default function Recipes() {
     }));
   };
 
-  const generateRecipe = async () => {
+  const generateRecipes = async () => {
     if (form.servings <= 0) {
       alert('Number of servings must be greater than 0');
       return;
     }
 
+    if (form.numberOfRecipes <= 0 || form.numberOfRecipes > 5) {
+      alert('Number of recipes must be between 1 and 5');
+      return;
+    }
+
     try {
-      setLoading(true);
+      setIsGenerating(true);
+      setGenerationProgress(0);
       
       // Prepare preferred items
       const preferredItems = form.selectedItems.length > 0
@@ -133,7 +196,8 @@ export default function Recipes() {
         ? equipment.filter(eq => form.selectedEquipment.includes(eq.id))
         : null;
 
-      const response = await fetch('/api/generate-recipe', {
+      // Make a single API call to generate multiple recipes
+      const response = await fetch('/api/generate-recipes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -143,30 +207,42 @@ export default function Recipes() {
           preferredItems,
           specialRequests: form.specialRequests,
           includeEquipment: form.includeEquipment,
-          equipment: selectedEquipment
+          equipment: selectedEquipment,
+          numberOfRecipes: form.numberOfRecipes
         }),
       });
 
+      setGenerationProgress(50); // Show progress after API call is made
+
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to generate recipe');
+        throw new Error(error.error || 'Failed to generate recipes');
       }
+      
+      const newRecipes = await response.json();
+      setGenerationProgress(100); // Complete the progress
 
-      const recipe = await response.json();
-      setRecipes([...recipes, recipe]);
-      setShowForm(false);
-      setForm({
-        servings: 2,
-        selectedItems: [],
-        specialRequests: '',
-        includeEquipment: false,
-        selectedEquipment: [],
-        showEquipmentSelection: false
-      });
+      if (Array.isArray(newRecipes) && newRecipes.length > 0) {
+        setRecipes([...recipes, ...newRecipes]);
+        setShowForm(false);
+        setForm({
+          servings: 2,
+          selectedItems: [],
+          specialRequests: '',
+          includeEquipment: false,
+          selectedEquipment: [],
+          showEquipmentSelection: false,
+          numberOfRecipes: 2
+        });
+      } else {
+        throw new Error('No recipes were generated');
+      }
       
     } catch (error) {
-      console.error('Error generating recipe:', error);
-      alert(error instanceof Error ? error.message : 'Error generating recipe');
+      console.error('Error generating recipes:', error);
+      alert(error instanceof Error ? error.message : 'Error generating recipes');
+    } finally {
+      setIsGenerating(false);
       setLoading(false);
     }
   };
@@ -178,6 +254,28 @@ export default function Recipes() {
 
     try {
       setCookingId(recipeId);
+      
+      // First, ensure the recipe is saved
+      const recipeToSave = recipes.find(r => r.id === recipeId);
+      if (recipeToSave && !recipeToSave.saved) {
+        try {
+          // Call API to mark the recipe as saved
+          await fetch(`/api/recipes/${recipeId}/save`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+          
+          // Update local state for saved recipes (will be removed in next step)
+          setSavedRecipes([...savedRecipes, {...recipeToSave, saved: true}]);
+        } catch (error) {
+          console.error('Error auto-saving recipe before cooking:', error);
+          // Continue with cooking even if saving fails
+        }
+      }
+      
+      // Now cook the recipe
       const response = await fetch('/api/cook-recipe', {
         method: 'POST',
         headers: {
@@ -192,6 +290,15 @@ export default function Recipes() {
       // Remove from both recipes and savedRecipes
       setRecipes(recipes.filter(recipe => recipe.id !== recipeId));
       setSavedRecipes(savedRecipes.filter(recipe => recipe.id !== recipeId));
+      
+      // Refresh inventory
+      const invResponse = await fetch('/api/items?excludeCategory=Cooking Equipment');
+      const invData = await invResponse.json();
+      setInventory(invData);
+      
+      // Refresh available recipes
+      refreshAvailableRecipes();
+      
       alert('Recipe cooked! Inventory has been updated.');
     } catch (error) {
       console.error('Error cooking recipe:', error);
@@ -201,20 +308,63 @@ export default function Recipes() {
     }
   };
 
-  const handleSaveRecipe = (recipe: RecipeWithIngredients) => {
-    setSavedRecipes([...savedRecipes, recipe]);
-    setRecipes(recipes.filter(r => r.id !== recipe.id));
+  const handleSaveRecipe = async (recipe: RecipeWithIngredients) => {
+    try {
+      // Call API to mark the recipe as saved
+      const response = await fetch(`/api/recipes/${recipe.id}/save`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save recipe');
+      }
+      
+      // Update local state
+      const updatedRecipe = { ...recipe, saved: true };
+      setSavedRecipes([...savedRecipes, updatedRecipe]);
+      setRecipes(recipes.filter(r => r.id !== recipe.id));
+    } catch (error) {
+      console.error('Error saving recipe:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save recipe');
+    }
   };
 
   const handleDiscardRecipe = (recipeId: number) => {
     if (window.confirm('Are you sure you want to discard this recipe?')) {
       setRecipes(recipes.filter(recipe => recipe.id !== recipeId));
+      
+      // Call API to delete the recipe
+      fetch(`/api/recipes/${recipeId}`, {
+        method: 'DELETE',
+      }).catch(error => {
+        console.error('Error deleting recipe:', error);
+      });
     }
   };
 
-  const handleDeleteSavedRecipe = (recipeId: number) => {
+  const handleDeleteSavedRecipe = async (recipeId: number) => {
     if (window.confirm('Are you sure you want to delete this saved recipe?')) {
-      setSavedRecipes(savedRecipes.filter(recipe => recipe.id !== recipeId));
+      try {
+        // Call API to delete the recipe and unmark as saved
+        const response = await fetch(`/api/recipes/${recipeId}`, {
+          method: 'DELETE',
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to delete recipe');
+        }
+        
+        // Update local state
+        setSavedRecipes(savedRecipes.filter(recipe => recipe.id !== recipeId));
+      } catch (error) {
+        console.error('Error deleting saved recipe:', error);
+        alert(error instanceof Error ? error.message : 'Failed to delete saved recipe');
+      }
     }
   };
 
@@ -251,259 +401,422 @@ export default function Recipes() {
           )}
         </div>
       </div>
-      <p className="text-slate-600 mb-4">{recipe.description}</p>
-      <div className="space-y-2">
-        <p className="text-sm text-slate-600">
-          Cooking Time: {recipe.cookingTime} minutes
-        </p>
-        <p className="text-sm text-slate-600">
-          Servings: {recipe.servings}
-        </p>
-        <div className="mt-4 p-4 bg-slate-100 rounded-lg">
-          <h4 className="font-medium mb-2 text-slate-800">Ingredients:</h4>
-          <ul className="text-sm text-slate-600 space-y-1 mb-4">
-            {recipe.ingredients.map((ingredient, index) => (
-              <li key={index} className="flex justify-between">
-                <span>{ingredient.item.name}</span>
-                <span className="font-medium">
-                  {ingredient.quantity} {ingredient.unit}
-                </span>
+      
+      <div className="text-sm text-slate-600 mb-4">
+        <p>{recipe.description}</p>
+        <div className="mt-1 flex gap-2">
+          <span className="text-slate-700">Serves: {recipe.servings}</span>
+          <span className="text-slate-700">Cooking time: {recipe.cookingTime} mins</span>
+        </div>
+      </div>
+      
+      <div className="space-y-4">
+        <div>
+          <h4 className="font-semibold text-md mb-2 text-slate-700">Ingredients</h4>
+          <ul className="list-disc list-inside space-y-1">
+            {recipe.ingredients.map((ingredient, idx) => (
+              <li key={idx} className="text-sm text-slate-600">
+                {ingredient.quantity} {ingredient.unit} {ingredient.item.name}
               </li>
             ))}
           </ul>
-
-          {recipe.equipment && recipe.equipment.length > 0 && (
-            <>
-              <h4 className="font-medium mb-2 text-slate-800">Required Equipment:</h4>
-              <ul className="text-sm text-slate-600 space-y-1 mb-4">
-                {recipe.equipment.map((eq, index) => (
-                  <li key={index}>{eq.item.name}</li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          <h4 className="font-medium mb-2 text-slate-800">Instructions:</h4>
-          <p className="text-sm text-slate-600 whitespace-pre-line">
-            {recipe.instructions}
-          </p>
         </div>
+        
+        {recipe.equipment && recipe.equipment.length > 0 && (
+          <div>
+            <h4 className="font-semibold text-md mb-2 text-slate-700">Equipment</h4>
+            <ul className="list-disc list-inside">
+              {recipe.equipment.map((eq, idx) => (
+                <li key={idx} className="text-sm text-slate-600">
+                  {eq.item.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        <div>
+          <h4 className="font-semibold text-md mb-2 text-slate-700">Instructions</h4>
+          <div className="text-sm text-slate-600 whitespace-pre-line">
+            {recipe.instructions}
+          </div>
+        </div>
+        
         <button
-          className="w-full mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
           onClick={() => handleCookRecipe(recipe.id)}
           disabled={cookingId === recipe.id}
+          className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {cookingId === recipe.id ? 'Cooking...' : 'Cook This Recipe'}
+          {cookingId === recipe.id ? 'Cooking...' : 'Cook Recipe'}
         </button>
       </div>
     </div>
   );
 
+  // Replace the ingredient selection grid with toggle buttons
+  const renderIngredientSelection = () => (
+    <div className="bg-slate-50 p-3 rounded-md border border-slate-200 mb-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {inventory.map(item => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => toggleIngredient(item.id)}
+            className={`p-2 text-left text-sm rounded-md flex justify-between items-center transition-colors ${
+              form.selectedItems.includes(item.id)
+                ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
+            }`}
+            title={`${item.name} (${item.quantity} ${item.unit})`}
+          >
+            <span className="truncate mr-2">{item.name}</span>
+            <span className="text-xs whitespace-nowrap">
+              {item.quantity} {item.unit}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Get the selected available recipe details
+  const getSelectedRecipeDetails = () => {
+    if (selectedAvailableRecipe === null) return null;
+    return savedRecipes.find(recipe => recipe.id === selectedAvailableRecipe);
+  };
+
+  // Handle clicking on a recipe tag
+  const handleRecipeTagClick = (recipeId: number) => {
+    setSelectedAvailableRecipe(recipeId === selectedAvailableRecipe ? null : recipeId);
+    setActiveTab('saved');
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-slate-800">Available Recipes</h2>
+    <div className="max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-slate-900">Recipes</h2>
         <button
-          onClick={() => setShowForm(!showForm)}
-          disabled={loading}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center"
+          onClick={() => {
+            setShowForm(!showForm);
+            if (showForm) setActiveTab('new');
+          }}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700"
         >
-          {loading ? 'Generating...' : 'Generate Recipe'}
-          {!loading && (showForm ? 
-            <ChevronUpIcon className="w-5 h-5 ml-1" /> : 
-            <ChevronDownIcon className="w-5 h-5 ml-1" />
-          )}
+          {showForm ? 'Cancel' : 'Generate New Recipe'}
         </button>
       </div>
-
-      {showForm && (
-        <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 space-y-4">
-          <div>
-            <label htmlFor="servings" className="block text-sm font-medium text-slate-700">
-              How many people are you cooking for? *
-            </label>
-            <input
-              type="number"
-              id="servings"
-              min="1"
-              value={form.servings}
-              onChange={(e) => setForm(prev => ({ ...prev, servings: parseInt(e.target.value) || 0 }))}
-              className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              required
-            />
+      
+      {/* Display available recipe tags if any, or an empty state */}
+      {!showForm && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center">
+              <h3 className="text-md font-medium text-slate-800">Ready to Cook:</h3>
+              <span className="ml-2 text-xs text-slate-500">
+                (Saved or previously cooked recipes you can make with your current ingredients)
+              </span>
+            </div>
+            <button 
+              onClick={refreshAvailableRecipes} 
+              className="text-indigo-600 hover:text-indigo-800"
+              title="Refresh available recipes"
+            >
+              <ArrowPathIcon className="w-4 h-4" />
+            </button>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Select ingredients you'd like to use (optional)
-            </label>
-            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {inventory.map(item => (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    setForm(prev => ({
-                      ...prev,
-                      selectedItems: prev.selectedItems.includes(item.id)
-                        ? prev.selectedItems.filter(id => id !== item.id)
-                        : [...prev.selectedItems, item.id]
-                    }));
-                  }}
-                  className={`p-2 border ${
-                    form.selectedItems.includes(item.id)
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-slate-200 hover:border-indigo-300'
-                  } rounded-md cursor-pointer`}
+          
+          {availableRecipes.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {availableRecipes.map(recipe => (
+                <button 
+                  key={recipe.id}
+                  onClick={() => handleRecipeTagClick(recipe.id)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    selectedAvailableRecipe === recipe.id
+                      ? 'bg-indigo-600 text-white' 
+                      : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'
+                  }`}
                 >
-                  <div className="font-medium text-slate-800">{item.name}</div>
-                  <div className="text-sm text-slate-600">
-                    {item.quantity} {item.unit}
-                  </div>
-                </div>
+                  {recipe.name} ({recipe.cookingTime} mins)
+                </button>
               ))}
             </div>
+          ) : (
+            <div className="bg-slate-50 py-3 px-4 rounded-md border border-slate-200 text-slate-600 text-sm">
+              No recipes available to cook with your current ingredients. 
+              {savedRecipes.length > 0 ? (
+                <span> Try adding more ingredients to your inventory.</span>
+              ) : (
+                <span> Save some recipes first, then add ingredients to your inventory.</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Show the selected recipe if one is selected */}
+      {selectedAvailableRecipe !== null && !showForm && (
+        <div className="mb-6 bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+          <div className="flex justify-between items-start">
+            <h3 className="text-lg font-semibold text-indigo-800">Selected Recipe</h3>
+            <button 
+              onClick={() => setSelectedAvailableRecipe(null)}
+              className="text-indigo-600 hover:text-indigo-800"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
           </div>
+          {getSelectedRecipeDetails() && (
+            <div className="mt-3">
+              <RecipeCard 
+                recipe={getSelectedRecipeDetails()!} 
+                isSaved={true} 
+              />
+            </div>
+          )}
+        </div>
+      )}
+      
+      {showForm && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 mb-6">
+          <h3 className="text-lg font-semibold mb-4 text-slate-800">Generate Recipe</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Number of Servings
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={form.servings}
+                onChange={(e) => setForm({ ...form, servings: parseInt(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Number of Recipes to Generate (1-5)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="5"
+                value={form.numberOfRecipes}
+                onChange={(e) => setForm({ ...form, numberOfRecipes: parseInt(e.target.value) || 1 })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+            
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-slate-700">
+                  Preferred Ingredients (Optional)
+                </label>
+                <button
+                  type="button"
+                  onClick={toggleIngredientSelection}
+                  className="text-indigo-600 hover:text-indigo-800 text-sm flex items-center"
+                >
+                  {showIngredientSelection ? (
+                    <>
+                      <ChevronUpIcon className="h-4 w-4 mr-1" />
+                      Hide ingredients
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDownIcon className="h-4 w-4 mr-1" />
+                      Select ingredients
+                    </>
+                  )}
+                </button>
+              </div>
+              
+              {/* Selected ingredients display */}
+              {form.selectedItems.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {inventory
+                    .filter(item => form.selectedItems.includes(item.id))
+                    .map(item => (
+                      <span 
+                        key={item.id}
+                        className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs flex items-center"
+                      >
+                        {item.name}
+                        <button 
+                          onClick={() => toggleIngredient(item.id)}
+                          className="ml-1 text-indigo-600 hover:text-indigo-800"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))
+                  }
+                </div>
+              )}
+              
+              {/* Ingredient selection toggle buttons */}
+              {showIngredientSelection && renderIngredientSelection()}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Special Requests (Optional)
+              </label>
+              <textarea
+                value={form.specialRequests}
+                onChange={(e) => setForm({ ...form, specialRequests: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="E.g., quick meal, vegetarian, low-carb..."
+                rows={2}
+              />
+            </div>
+            
+            <div className="flex items-center">
               <input
                 type="checkbox"
                 id="includeEquipment"
                 checked={form.includeEquipment}
                 onChange={toggleEquipmentInclusion}
-                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded"
               />
-              <label htmlFor="includeEquipment" className="text-sm font-medium text-slate-700 flex items-center">
-                Include cooking equipment instructions
-                {form.includeEquipment && (
-                  <button 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      toggleEquipmentSelection();
-                    }}
-                    className="ml-2 text-indigo-600 hover:text-indigo-800 text-sm underline"
-                  >
-                    {form.showEquipmentSelection ? "Hide equipment selection" : "Customize equipment"}
-                  </button>
-                )}
+              <label htmlFor="includeEquipment" className="ml-2 block text-sm text-slate-700">
+                Include equipment instructions
               </label>
+              {form.includeEquipment && (
+                <button
+                  type="button"
+                  onClick={toggleEquipmentSelection}
+                  className="ml-2 text-indigo-600 hover:text-indigo-800 text-sm flex items-center"
+                >
+                  {form.showEquipmentSelection ? (
+                    <>
+                      <ChevronUpIcon className="h-4 w-4 mr-1" />
+                      Hide equipment
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDownIcon className="h-4 w-4 mr-1" />
+                      Select equipment
+                    </>
+                  )}
+                </button>
+              )}
             </div>
             
             {form.includeEquipment && form.showEquipmentSelection && (
-              <div className="pl-6 mt-2 space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Select equipment to use
-                  </label>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setForm(prev => ({ 
-                          ...prev, 
-                          selectedEquipment: equipment.map(eq => eq.id)
-                        }));
-                      }}
-                      className="text-xs text-indigo-600 hover:text-indigo-800"
-                    >
-                      Select All
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setForm(prev => ({ ...prev, selectedEquipment: [] }));
-                      }}
-                      className="text-xs text-indigo-600 hover:text-indigo-800"
-                    >
-                      Clear All
-                    </button>
-                  </div>
+              <div className="pl-6">
+                <div className="text-sm font-medium text-slate-700 mb-1">
+                  Available Equipment
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 border border-slate-200 rounded">
+                <div className="space-y-2 max-h-40 overflow-y-auto">
                   {equipment.map(item => (
-                    <div
-                      key={item.id}
-                      onClick={() => {
-                        setForm(prev => ({
-                          ...prev,
-                          selectedEquipment: prev.selectedEquipment.includes(item.id)
-                            ? prev.selectedEquipment.filter(id => id !== item.id)
-                            : [...prev.selectedEquipment, item.id]
-                        }));
-                      }}
-                      className={`p-2 border ${
-                        form.selectedEquipment.includes(item.id)
-                          ? 'border-indigo-500 bg-indigo-50'
-                          : 'border-slate-200 hover:border-indigo-300'
-                      } rounded-md cursor-pointer`}
-                    >
-                      <div className="font-medium text-slate-800">{item.name}</div>
+                    <div key={item.id} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`equipment-${item.id}`}
+                        checked={form.selectedEquipment.includes(item.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setForm({
+                              ...form,
+                              selectedEquipment: [...form.selectedEquipment, item.id]
+                            });
+                          } else {
+                            setForm({
+                              ...form,
+                              selectedEquipment: form.selectedEquipment.filter(id => id !== item.id)
+                            });
+                          }
+                        }}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded"
+                      />
+                      <label htmlFor={`equipment-${item.id}`} className="ml-2 block text-sm text-slate-700">
+                        {item.name}
+                      </label>
                     </div>
                   ))}
                 </div>
-                {equipment.length === 0 && (
-                  <p className="text-sm text-slate-500">
-                    No equipment found. Add equipment in the Equipment tab.
-                  </p>
-                )}
               </div>
             )}
-          </div>
-
-          <div>
-            <label htmlFor="specialRequests" className="block text-sm font-medium text-slate-700">
-              Special requests (optional)
-            </label>
-            <textarea
-              id="specialRequests"
-              value={form.specialRequests}
-              onChange={(e) => setForm(prev => ({ ...prev, specialRequests: e.target.value }))}
-              placeholder="E.g., vegetarian, low-carb, quick meal, etc."
-              className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              rows={3}
-            />
-          </div>
-
-          <div className="flex justify-end">
+            
             <button
-              onClick={generateRecipe}
-              disabled={loading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              onClick={generateRecipes}
+              disabled={loading || isGenerating}
+              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Generating...' : 'Generate Recipe'}
+              {isGenerating 
+                ? `Generating... ${generationProgress}%` 
+                : loading 
+                  ? 'Loading...' 
+                  : `Generate ${form.numberOfRecipes} Recipe${form.numberOfRecipes > 1 ? 's' : ''}`}
             </button>
           </div>
         </div>
       )}
-
-      {recipes.length === 0 && savedRecipes.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-slate-600">
-            No recipes generated yet. Click the button above to generate a recipe based on your inventory!
-          </p>
+      
+      {/* Tabs for new and saved recipes */}
+      <div className="mb-6">
+        <div className="border-b border-slate-200">
+          <div className="-mb-px flex">
+            <button
+              className={`px-4 py-2 border-b-2 font-medium text-sm ${
+                activeTab === 'new' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              }`}
+              onClick={() => {
+                setActiveTab('new');
+                setShowForm(false);
+                setSelectedAvailableRecipe(null);
+              }}
+            >
+              {recipes.length > 0 ? `New Recipes (${recipes.length})` : 'New Recipes'}
+            </button>
+            <button
+              className={`px-4 py-2 border-b-2 font-medium text-sm ${
+                activeTab === 'saved' 
+                  ? 'ml-8 border-indigo-600 text-indigo-600'
+                  : 'ml-8 border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              }`}
+              onClick={() => {
+                if (savedRecipes.length > 0) {
+                  setActiveTab('saved');
+                  setShowForm(false);
+                }
+              }}
+              disabled={savedRecipes.length === 0}
+            >
+              {savedRecipes.length > 0 
+                ? `Saved Recipes (${savedRecipes.length})` 
+                : 'No Saved Recipes'}
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      {loading && !isGenerating ? (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Loading recipes...</p>
         </div>
       ) : (
         <>
-          {recipes.length > 0 && (
-            <>
-              <h3 className="text-lg font-medium text-slate-800 mt-6 mb-4">New Recipes</h3>
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-                {recipes.map((recipe) => (
-                  <RecipeCard key={recipe.id} recipe={recipe} isSaved={false} />
-                ))}
-              </div>
-            </>
-          )}
-
-          {savedRecipes.length > 0 && (
-            <>
-              <h3 className="text-lg font-medium text-slate-800 mt-6 mb-4">Saved Recipes</h3>
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-                {savedRecipes.map((recipe) => (
+          {recipes.length === 0 && savedRecipes.length === 0 ? (
+            <div className="text-center py-12 bg-slate-50 rounded-lg border border-slate-200">
+              <p className="text-slate-600">No recipes yet. Generate your first recipe!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {!showForm && activeTab === 'new' && recipes.map(recipe => (
+                <RecipeCard key={recipe.id} recipe={recipe} isSaved={false} />
+              ))}
+              
+              {!showForm && activeTab === 'saved' && savedRecipes.length > 0 && (
+                savedRecipes.map(recipe => (
                   <RecipeCard key={recipe.id} recipe={recipe} isSaved={true} />
-                ))}
-              </div>
-            </>
+                ))
+              )}
+            </div>
           )}
         </>
       )}

@@ -34,6 +34,7 @@ model Recipe {
   instructions String
   cookingTime  Int
   servings     Int
+  saved        Boolean    @default(false)
   createdAt    DateTime   @default(now())
   ingredients  RecipeIngredient[]
   equipment    RecipeEquipment[]
