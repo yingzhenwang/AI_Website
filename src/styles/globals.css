@@ -2,26 +2,72 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-neutral-200;
+  }
+
+  body {
+    @apply bg-white text-neutral-800 antialiased;
   }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    rgb(var(--background-end-rgb))
-  )
-  rgb(var(--background-start-rgb));
+@layer utilities {
+  .focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+}
+
+@layer components {
+  /* Button styles */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors 
+    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+    disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary-600 text-white hover:bg-secondary-700;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-neutral-100 hover:text-neutral-900;
+  }
+
+  .btn-outline {
+    @apply border border-neutral-300 bg-transparent hover:bg-neutral-100 hover:text-neutral-900;
+  }
+
+  /* Card styles */
+  .card {
+    @apply rounded-xl border border-neutral-200 bg-white text-neutral-800 shadow-sm transition-all hover:shadow-md;
+  }
+
+  /* Input styles */
+  .input {
+    @apply rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-sm 
+    placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1
+    disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+  }
+
+  .badge-primary {
+    @apply bg-primary-50 text-primary-700 hover:bg-primary-100;
+  }
+
+  .badge-secondary {
+    @apply bg-secondary-50 text-secondary-700 hover:bg-secondary-100;
+  }
 } 

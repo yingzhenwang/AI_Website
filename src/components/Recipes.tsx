@@ -28,7 +28,7 @@ interface RecipeWithIngredients extends Recipe {
     item: Item;
   }[];
   equipment?: RecipeEquipment[];
-  saved?: boolean;
+  saved: boolean;
 }
 
 export default function Recipes() {
@@ -369,85 +369,105 @@ export default function Recipes() {
   };
 
   const RecipeCard = ({ recipe, isSaved }: { recipe: RecipeWithIngredients; isSaved: boolean }) => (
-    <div className="bg-slate-50 p-6 rounded-lg shadow-sm hover:shadow transition-shadow border border-slate-200">
-      <div className="flex justify-between items-start mb-2">
-        <h3 className="text-lg font-semibold text-slate-800">{recipe.name}</h3>
-        <div className="flex space-x-2">
-          {!isSaved ? (
-            <>
+    <div className="card overflow-hidden">
+      <div className="p-5 pb-3">
+        <div className="flex justify-between items-start mb-3">
+          <h3 className="text-lg font-semibold text-neutral-800">{recipe.name}</h3>
+          <div className="flex space-x-1">
+            {!isSaved ? (
+              <>
+                <button
+                  onClick={() => handleSaveRecipe(recipe)}
+                  className="p-1.5 text-neutral-500 hover:text-primary-600 rounded-md hover:bg-neutral-50"
+                  title="Save recipe"
+                >
+                  <BookmarkIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handleDiscardRecipe(recipe.id)}
+                  className="p-1.5 text-neutral-500 hover:text-error-600 rounded-md hover:bg-neutral-50"
+                  title="Discard recipe"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </>
+            ) : (
               <button
-                onClick={() => handleSaveRecipe(recipe)}
-                className="p-1 text-slate-600 hover:text-indigo-600 rounded-full hover:bg-slate-100"
-                title="Save recipe"
-              >
-                <BookmarkIcon className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handleDiscardRecipe(recipe.id)}
-                className="p-1 text-slate-600 hover:text-red-600 rounded-full hover:bg-slate-100"
-                title="Discard recipe"
+                onClick={() => handleDeleteSavedRecipe(recipe.id)}
+                className="p-1.5 text-neutral-500 hover:text-error-600 rounded-md hover:bg-neutral-50"
+                title="Delete saved recipe"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
-            </>
-          ) : (
-            <button
-              onClick={() => handleDeleteSavedRecipe(recipe.id)}
-              className="p-1 text-slate-600 hover:text-red-600 rounded-full hover:bg-slate-100"
-              title="Delete saved recipe"
-            >
-              <XMarkIcon className="w-5 h-5" />
-            </button>
-          )}
-        </div>
-      </div>
-      
-      <div className="text-sm text-slate-600 mb-4">
-        <p>{recipe.description}</p>
-        <div className="mt-1 flex gap-2">
-          <span className="text-slate-700">Serves: {recipe.servings}</span>
-          <span className="text-slate-700">Cooking time: {recipe.cookingTime} mins</span>
-        </div>
-      </div>
-      
-      <div className="space-y-4">
-        <div>
-          <h4 className="font-semibold text-md mb-2 text-slate-700">Ingredients</h4>
-          <ul className="list-disc list-inside space-y-1">
-            {recipe.ingredients.map((ingredient, idx) => (
-              <li key={idx} className="text-sm text-slate-600">
-                {ingredient.quantity} {ingredient.unit} {ingredient.item.name}
-              </li>
-            ))}
-          </ul>
+            )}
+          </div>
         </div>
         
-        {recipe.equipment && recipe.equipment.length > 0 && (
+        <div className="text-sm text-neutral-600 mb-4">
+          <p>{recipe.description}</p>
+          <div className="mt-2 flex gap-3">
+            <span className="badge badge-primary">Serves: {recipe.servings}</span>
+            <span className="badge badge-secondary">Time: {recipe.cookingTime} mins</span>
+          </div>
+        </div>
+        
+        <div className="space-y-5 mb-5">
           <div>
-            <h4 className="font-semibold text-md mb-2 text-slate-700">Equipment</h4>
-            <ul className="list-disc list-inside">
-              {recipe.equipment.map((eq, idx) => (
-                <li key={idx} className="text-sm text-slate-600">
-                  {eq.item.name}
+            <h4 className="font-medium text-sm text-neutral-700 uppercase tracking-wide mb-2">Ingredients</h4>
+            <ul className="space-y-1.5 text-sm">
+              {recipe.ingredients.map((ingredient, idx) => (
+                <li key={idx} className="flex items-baseline gap-2">
+                  <span className="text-primary-600 text-xs">•</span>
+                  <span className="text-neutral-800">
+                    {ingredient.quantity} {ingredient.unit} {ingredient.item.name}
+                  </span>
                 </li>
               ))}
             </ul>
           </div>
-        )}
-        
-        <div>
-          <h4 className="font-semibold text-md mb-2 text-slate-700">Instructions</h4>
-          <div className="text-sm text-slate-600 whitespace-pre-line">
-            {recipe.instructions}
+          
+          {recipe.equipment && recipe.equipment.length > 0 && (
+            <div>
+              <h4 className="font-medium text-sm text-neutral-700 uppercase tracking-wide mb-2">Equipment</h4>
+              <ul className="space-y-1.5 text-sm">
+                {recipe.equipment.map((eq, idx) => (
+                  <li key={idx} className="flex items-baseline gap-2">
+                    <span className="text-secondary-600 text-xs">•</span>
+                    <span className="text-neutral-800">{eq.item.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          <div>
+            <h4 className="font-medium text-sm text-neutral-700 uppercase tracking-wide mb-2">Instructions</h4>
+            <div className="text-sm text-neutral-700 whitespace-pre-line">
+              {recipe.instructions}
+            </div>
           </div>
         </div>
-        
+      </div>
+      
+      <div className="border-t border-neutral-200 px-5 py-3 bg-neutral-50">
         <button
           onClick={() => handleCookRecipe(recipe.id)}
           disabled={cookingId === recipe.id}
-          className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full btn btn-primary py-2 px-4 flex items-center justify-center gap-2"
         >
-          {cookingId === recipe.id ? 'Cooking...' : 'Cook Recipe'}
+          {cookingId === recipe.id ? (
+            <>
+              <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Cooking...</span>
+            </>
+          ) : (
+            <>
+              <span>Cook Recipe</span>
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -508,17 +528,17 @@ export default function Recipes() {
       
       {/* Display available recipe tags if any, or an empty state */}
       {!showForm && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center">
-              <h3 className="text-md font-medium text-slate-800">Ready to Cook:</h3>
-              <span className="ml-2 text-xs text-slate-500">
-                (Saved or previously cooked recipes you can make with your current ingredients)
+              <h3 className="text-lg font-semibold text-primary-700">Ready to Cook</h3>
+              <span className="ml-2 text-xs text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full">
+                Recipes you can make with your current ingredients
               </span>
             </div>
             <button 
               onClick={refreshAvailableRecipes} 
-              className="text-indigo-600 hover:text-indigo-800"
+              className="p-1.5 text-primary-600 hover:text-primary-800 hover:bg-primary-50 rounded-full transition-colors"
               title="Refresh available recipes"
             >
               <ArrowPathIcon className="w-4 h-4" />
@@ -526,29 +546,32 @@ export default function Recipes() {
           </div>
           
           {availableRecipes.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 animate-fade-in">
               {availableRecipes.map(recipe => (
                 <button 
                   key={recipe.id}
                   onClick={() => handleRecipeTagClick(recipe.id)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                     selectedAvailableRecipe === recipe.id
-                      ? 'bg-indigo-600 text-white' 
-                      : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'
+                      ? 'bg-primary-600 text-white shadow-sm' 
+                      : 'bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100'
                   }`}
                 >
-                  {recipe.name} ({recipe.cookingTime} mins)
+                  {recipe.name} 
+                  <span className="ml-1 opacity-75">({recipe.cookingTime} min)</span>
                 </button>
               ))}
             </div>
           ) : (
-            <div className="bg-slate-50 py-3 px-4 rounded-md border border-slate-200 text-slate-600 text-sm">
-              No recipes available to cook with your current ingredients. 
-              {savedRecipes.length > 0 ? (
-                <span> Try adding more ingredients to your inventory.</span>
-              ) : (
-                <span> Save some recipes first, then add ingredients to your inventory.</span>
-              )}
+            <div className="bg-neutral-50 py-4 px-5 rounded-xl border border-neutral-200 text-neutral-600 text-sm">
+              <p className="mb-1 font-medium">No recipes available to cook right now</p>
+              <p>
+                {savedRecipes.length > 0 ? (
+                  <span>Try adding more ingredients to your inventory to unlock recipes.</span>
+                ) : (
+                  <span>Save some recipes first, then add ingredients to your inventory.</span>
+                )}
+              </p>
             </div>
           )}
         </div>
@@ -556,12 +579,12 @@ export default function Recipes() {
       
       {/* Show the selected recipe if one is selected */}
       {selectedAvailableRecipe !== null && !showForm && (
-        <div className="mb-6 bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-          <div className="flex justify-between items-start">
-            <h3 className="text-lg font-semibold text-indigo-800">Selected Recipe</h3>
+        <div className="mb-8 bg-primary-50 p-6 rounded-xl border border-primary-200 animate-fade-in">
+          <div className="flex justify-between items-start mb-4">
+            <h3 className="text-lg font-semibold text-primary-800">Selected Recipe</h3>
             <button 
               onClick={() => setSelectedAvailableRecipe(null)}
-              className="text-indigo-600 hover:text-indigo-800"
+              className="p-1.5 text-primary-600 hover:text-primary-800 hover:bg-primary-100 rounded-full transition-colors"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>
